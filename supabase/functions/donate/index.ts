@@ -13,7 +13,11 @@ async function getSimPayToken(): Promise<string> {
 
   const res = await fetch("https://api.saq.digital/v2/finance/auth-token/", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": "Mozilla/5.0 (compatible; DonationApp/1.0)",
+      "Accept": "application/json",
+    },
     body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
   });
 
