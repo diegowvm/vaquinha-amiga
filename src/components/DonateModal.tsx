@@ -43,6 +43,9 @@ export function DonateModal({ open, onOpenChange, campaignId, campaignTitle }: D
 
       setQrCode(data.qr_code || "");
       setPixCode(data.pix_code || "");
+      if (!data.qr_code && !data.pix_code) {
+        throw new Error("Nenhum QR Code retornado");
+      }
       setStep("qrcode");
     } catch (err) {
       console.error(err);
