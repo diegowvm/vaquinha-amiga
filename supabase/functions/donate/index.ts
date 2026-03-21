@@ -11,7 +11,7 @@ async function getSimPayToken(): Promise<string> {
   const clientId = Deno.env.get("SIMPAY_CLIENT_ID")!;
   const clientSecret = Deno.env.get("SIMPAY_CLIENT_SECRET")!;
 
-  const res = await fetch("https://api.somossimpay.com.br/v2/finance/auth-token/", {
+  const res = await fetch("https://api.saq.digital/v2/finance/auth-token/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
