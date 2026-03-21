@@ -5,6 +5,7 @@ export interface Campaign {
   meta_valor: number;
   valor_atual: number;
   imagem: string;
+  video: string;
   status: "active" | "paused" | "finished";
   created_at: string;
 }
