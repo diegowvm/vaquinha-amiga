@@ -11,9 +11,13 @@ async function getSimPayToken(): Promise<string> {
   const clientId = Deno.env.get("SIMPAY_CLIENT_ID")!;
   const clientSecret = Deno.env.get("SIMPAY_CLIENT_SECRET")!;
 
-  const res = await fetch("https://api.somossimpay.com.br/v2/finance/auth-token/", {
+  const res = await fetch("https://api.saq.digital/v2/finance/auth-token/", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": "Mozilla/5.0 (compatible; DonationApp/1.0)",
+      "Accept": "application/json",
+    },
     body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
   });
 
@@ -70,12 +74,14 @@ serve(async (req) => {
     const token = await getSimPayToken();
 
     // 2. Create Pix charge
-    const pixRes = await fetch("https://api.somossimpay.com.br/v2/finance/pix/cash-in/", {
+    const pixRes = await fetch("https://api.saq.digital/v2/finance/pix/cash-in/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
         "hmac": hmac,
+        "User-Agent": "Mozilla/5.0 (compatible; DonationApp/1.0)",
+        "Accept": "application/json",
       },
       body: JSON.stringify({
         amount: parseFloat(amountInReais),
