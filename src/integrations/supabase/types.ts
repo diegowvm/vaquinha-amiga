@@ -24,6 +24,7 @@ export type Database = {
           status: string
           titulo: string
           valor_atual: number
+          video: string
         }
         Insert: {
           created_at?: string
@@ -34,6 +35,7 @@ export type Database = {
           status?: string
           titulo: string
           valor_atual?: number
+          video?: string
         }
         Update: {
           created_at?: string
@@ -44,6 +46,7 @@ export type Database = {
           status?: string
           titulo?: string
           valor_atual?: number
+          video?: string
         }
         Relationships: []
       }
