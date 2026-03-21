@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Campaign, Donation } from "@/types/campaign";
 import { formatCurrency } from "@/lib/format";
 import { ProgressBar } from "@/components/ProgressBar";
