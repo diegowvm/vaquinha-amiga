@@ -14,14 +14,15 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
+    console.log("Webhook SimPay received:", JSON.stringify(body));
 
-    // SimPay sends payment confirmation with external_id = donation_id
-    const donationId = body.external_id || body.donation_id;
+    // SimPay sends `tag` as the donation_id we set during cash-in
+    const donationId = body.tag || body.external_id || body.donation_id;
     const paymentStatus = body.status;
 
     if (!donationId) {
       return new Response(
-        JSON.stringify({ error: "external_id is required" }),
+        JSON.stringify({ error: "tag/external_id is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -31,7 +32,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Check if donation exists and is still pending (idempotency)
+    // Check if donation exists
     const { data: donation, error: fetchError } = await supabase
       .from("donations")
       .select("*")
@@ -39,6 +40,7 @@ serve(async (req) => {
       .single();
 
     if (fetchError || !donation) {
+      console.error("Donation not found:", donationId);
       return new Response(
         JSON.stringify({ error: "Donation not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -53,7 +55,9 @@ serve(async (req) => {
       );
     }
 
-    if (paymentStatus === "paid" || paymentStatus === "approved" || paymentStatus === "confirmed") {
+    // SimPay uses "PAID" status for confirmed payments
+    const paidStatuses = ["paid", "PAID", "approved", "confirmed"];
+    if (paidStatuses.includes(paymentStatus)) {
       // Update donation status
       await supabase
         .from("donations")
@@ -69,8 +73,15 @@ serve(async (req) => {
       // Update transaction
       await supabase
         .from("transactions")
-        .update({ status: "paid", gateway_id: body.gateway_id || body.id || "" })
+        .update({
+          status: "paid",
+          gateway_id: body.qr_code_id || body.id || "",
+        })
         .eq("donation_id", donationId);
+
+      console.log("Donation confirmed:", donationId, "valor:", donation.valor);
+    } else {
+      console.log("Webhook status not paid:", paymentStatus, "for donation:", donationId);
     }
 
     return new Response(
@@ -78,7 +89,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error(err);
+    console.error("Webhook error:", err);
     return new Response(
       JSON.stringify({ error: "Internal error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
