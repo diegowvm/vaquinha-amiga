@@ -70,7 +70,7 @@ serve(async (req) => {
     const token = await getSimPayToken();
 
     // 2. Create Pix charge
-    const pixRes = await fetch("https://api.somossimpay.com.br/v2/finance/pix/cash-in/", {
+    const pixRes = await fetch("https://api.saq.digital/v2/finance/pix/cash-in/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
