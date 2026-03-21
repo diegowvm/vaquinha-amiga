@@ -80,6 +80,8 @@ serve(async (req) => {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`,
         "hmac": hmac,
+        "User-Agent": "Mozilla/5.0 (compatible; DonationApp/1.0)",
+        "Accept": "application/json",
       },
       body: JSON.stringify({
         amount: parseFloat(amountInReais),
