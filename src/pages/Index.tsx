@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Campaign } from "@/types/campaign";
 import { CampaignCard } from "@/components/CampaignCard";
 import { Header } from "@/components/Header";
