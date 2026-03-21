@@ -4,8 +4,7 @@ import { Campaign } from "@/types/campaign";
 import { CampaignCard } from "@/components/CampaignCard";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { Heart, TrendingUp, Users } from "lucide-react";
-import heroImg from "@/assets/hero-donation.jpg";
+import { Heart, TrendingUp, Shield } from "lucide-react";
 
 export default function Index() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -29,11 +28,7 @@ export default function Index() {
 
       {/* Hero */}
       <section className="relative overflow-hidden bg-foreground">
-        <img
-          src={heroImg}
-          alt="Comunidade unida"
-          className="absolute inset-0 w-full h-full object-cover opacity-40"
-        />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-foreground" />
         <div className="relative container py-20 md:py-28 text-center">
           <h1 className="text-3xl md:text-5xl font-bold text-primary-foreground leading-tight fade-in-up" style={{ lineHeight: "1.1" }}>
             Juntos fazemos<br />a diferença
@@ -67,10 +62,10 @@ export default function Index() {
           </div>
           <div className="flex items-center gap-3 fade-in-up stagger-3">
             <div className="p-2 rounded-lg bg-accent">
-              <Users className="w-5 h-5 text-primary" />
+              <Shield className="w-5 h-5 text-primary" />
             </div>
             <div className="text-left">
-              <p className="text-xs text-muted-foreground">Pix rápido</p>
+              <p className="text-xs text-muted-foreground">Pix seguro</p>
               <p className="text-sm font-medium">Sem cadastro necessário</p>
             </div>
           </div>
