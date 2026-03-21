@@ -14,7 +14,103 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      campaigns: {
+        Row: {
+          created_at: string
+          descricao: string
+          id: string
+          imagem: string
+          meta_valor: number
+          status: string
+          titulo: string
+          valor_atual: number
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string
+          id?: string
+          imagem?: string
+          meta_valor?: number
+          status?: string
+          titulo: string
+          valor_atual?: number
+        }
+        Update: {
+          created_at?: string
+          descricao?: string
+          id?: string
+          imagem?: string
+          meta_valor?: number
+          status?: string
+          titulo?: string
+          valor_atual?: number
+        }
+        Relationships: []
+      }
+      donations: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          id: string
+          status: string
+          valor: number
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          valor: number
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          created_at: string
+          donation_id: string
+          gateway_id: string
+          id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          donation_id: string
+          gateway_id?: string
+          id?: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          donation_id?: string
+          gateway_id?: string
+          id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_donation_id_fkey"
+            columns: ["donation_id"]
+            isOneToOne: false
+            referencedRelation: "donations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
