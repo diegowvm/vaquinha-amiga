@@ -3,6 +3,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { FakeDonationNotifications } from "@/components/FakeDonationNotifications";
+import { PageTracker } from "@/components/PageTracker";
 import Index from "./pages/Index";
 import CampaignDetail from "./pages/CampaignDetail";
 import Admin from "./pages/Admin";
@@ -16,6 +18,8 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <PageTracker />
+        <FakeDonationNotifications />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/c/:id" element={<CampaignDetail />} />
