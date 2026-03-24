@@ -18,6 +18,9 @@ import {
   Banknote,
   Clock,
   ChevronRight,
+  Sparkles,
+  Flame,
+  Star,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -59,6 +62,7 @@ function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: str
 export default function Index() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "trending" | "urgent">("all");
 
   const hero = useInView(0.1);
   const stats = useInView();
@@ -66,6 +70,7 @@ export default function Index() {
   const campaignsSection = useInView();
   const trust = useInView();
   const cta = useInView();
+  const testimonials = useInView();
 
   useEffect(() => {
     supabase
@@ -80,6 +85,13 @@ export default function Index() {
   }, []);
 
   const totalRaised = campaigns.reduce((s, c) => s + c.valor_atual, 0);
+  const totalDonors = campaigns.length * 47; // simulated
+
+  const filteredCampaigns = campaigns.filter((c) => {
+    if (filter === "trending") return c.valor_atual > c.meta_valor * 0.5;
+    if (filter === "urgent") return c.valor_atual < c.meta_valor * 0.4;
+    return true;
+  });
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -90,11 +102,12 @@ export default function Index() {
         ref={hero.ref}
         className="relative overflow-hidden bg-foreground"
       >
-        {/* Decorative shapes */}
         <div className="absolute inset-0">
           <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-primary/10 blur-3xl" />
           <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-secondary/10 blur-3xl" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-primary-foreground/5" />
+          <div className="absolute top-1/4 right-1/4 w-3 h-3 rounded-full bg-secondary/40 animate-pulse" />
+          <div className="absolute bottom-1/3 left-1/3 w-2 h-2 rounded-full bg-primary/30 animate-pulse" style={{ animationDelay: "1s" }} />
         </div>
 
         <div className="relative container py-24 md:py-36 lg:py-44">
@@ -102,8 +115,8 @@ export default function Index() {
             <div
               className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/15 text-primary-foreground/90 text-sm font-medium mb-6 transition-all duration-700 ${hero.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
             >
-              <Heart className="w-3.5 h-3.5 fill-current" />
-              Plataforma de doações via Pix
+              <Sparkles className="w-3.5 h-3.5" />
+              Mais de {totalDonors.toLocaleString("pt-BR")} doadores ativos
             </div>
 
             <h1
@@ -116,9 +129,8 @@ export default function Index() {
             <p
               className={`mt-5 text-primary-foreground/75 text-lg md:text-xl max-w-lg leading-relaxed transition-all duration-700 delay-200 ${hero.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
             >
-              Contribua com campanhas verificadas, acompanhe cada centavo em
-              tempo real e faça parte de uma comunidade que acredita na
-              solidariedade.
+              Contribua com campanhas verificadas via Pix, acompanhe cada centavo em
+              tempo real e faça parte de uma comunidade que acredita na solidariedade.
             </p>
 
             <div
@@ -126,21 +138,31 @@ export default function Index() {
             >
               <a
                 href="#campanhas"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:brightness-110 active:scale-[0.97] transition-all duration-200"
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:brightness-110 active:scale-[0.97] transition-all duration-200"
               >
-                Ver campanhas
-                <ArrowRight className="w-4 h-4" />
+                <Heart className="w-4 h-4 fill-current" />
+                Doar agora
               </a>
               <a
                 href="#como-funciona"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-primary-foreground/20 text-primary-foreground/90 font-medium text-sm hover:bg-primary-foreground/5 active:scale-[0.97] transition-all duration-200"
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl border border-primary-foreground/20 text-primary-foreground/90 font-medium text-sm hover:bg-primary-foreground/5 active:scale-[0.97] transition-all duration-200"
               >
                 Como funciona
               </a>
             </div>
+
+            {/* Urgency bar */}
+            <div
+              className={`mt-10 flex items-center gap-3 px-4 py-3 rounded-xl bg-secondary/15 border border-secondary/20 max-w-md transition-all duration-700 delay-500 ${hero.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+            >
+              <Flame className="w-5 h-5 text-secondary shrink-0 animate-pulse" />
+              <p className="text-sm text-primary-foreground/80">
+                <span className="font-bold text-secondary">{campaigns.length} campanhas</span> precisam da sua ajuda agora
+              </p>
+            </div>
           </div>
 
-          {/* Hero stats floating card */}
+          {/* Hero stats floating cards */}
           <div
             className={`hidden lg:flex absolute right-8 xl:right-16 top-1/2 -translate-y-1/2 flex-col gap-4 w-56 transition-all duration-700 delay-500 ${hero.visible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"}`}
           >
@@ -176,7 +198,7 @@ export default function Index() {
             {[
               { icon: Heart, label: "Campanhas ativas", value: <AnimatedCounter target={campaigns.length} />, color: "text-primary" },
               { icon: Banknote, label: "Total arrecadado", value: formatCurrency(totalRaised), color: "text-secondary" },
-              { icon: Clock, label: "Doação rápida", value: "< 30s", color: "text-primary" },
+              { icon: Users, label: "Doadores", value: <AnimatedCounter target={totalDonors} suffix="+" />, color: "text-primary" },
               { icon: Shield, label: "Transações seguras", value: "100%", color: "text-success" },
             ].map((s, i) => (
               <div
@@ -201,48 +223,23 @@ export default function Index() {
       <section ref={howIt.ref} id="como-funciona" className="py-20 md:py-28 bg-muted/40">
         <div className="container">
           <div className="text-center max-w-xl mx-auto mb-14">
-            <p
-              className={`text-sm font-semibold text-primary uppercase tracking-wider mb-3 transition-all duration-600 ${howIt.visible ? "opacity-100" : "opacity-0"}`}
-            >
+            <p className={`text-sm font-semibold text-primary uppercase tracking-wider mb-3 transition-all duration-600 ${howIt.visible ? "opacity-100" : "opacity-0"}`}>
               Simples e transparente
             </p>
-            <h2
-              className={`text-3xl md:text-4xl font-bold transition-all duration-600 delay-100 ${howIt.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
-              style={{ lineHeight: "1.1" }}
-            >
+            <h2 className={`text-3xl md:text-4xl font-bold transition-all duration-600 delay-100 ${howIt.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`} style={{ lineHeight: "1.1" }}>
               Como funciona
             </h2>
-            <p
-              className={`mt-4 text-muted-foreground text-base md:text-lg transition-all duration-600 delay-200 ${howIt.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
-            >
-              Em poucos segundos você contribui com quem mais precisa — sem
-              cadastro, sem burocracia.
+            <p className={`mt-4 text-muted-foreground text-base md:text-lg transition-all duration-600 delay-200 ${howIt.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+              Em poucos segundos você contribui com quem mais precisa — sem cadastro, sem burocracia.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 lg:gap-8 relative">
-            {/* Connector line on desktop */}
             <div className="hidden md:block absolute top-14 left-[16.6%] right-[16.6%] h-px bg-border" />
-
             {[
-              {
-                step: "01",
-                icon: Search,
-                title: "Escolha uma campanha",
-                desc: "Navegue pelas campanhas ativas, leia as histórias e escolha aquela que toca seu coração.",
-              },
-              {
-                step: "02",
-                icon: QrCode,
-                title: "Doe via Pix",
-                desc: "Escaneie o QR Code ou copie o código Pix. O pagamento é processado instantaneamente.",
-              },
-              {
-                step: "03",
-                icon: TrendingUp,
-                title: "Acompanhe o impacto",
-                desc: "Veja os valores atualizados em tempo real e saiba exatamente para onde seu dinheiro foi.",
-              },
+              { step: "01", icon: Search, title: "Escolha uma campanha", desc: "Navegue pelas campanhas ativas, leia as histórias e escolha aquela que toca seu coração." },
+              { step: "02", icon: QrCode, title: "Doe via Pix", desc: "Escaneie o QR Code ou copie o código Pix. O pagamento é processado instantaneamente." },
+              { step: "03", icon: TrendingUp, title: "Acompanhe o impacto", desc: "Veja os valores atualizados em tempo real e saiba exatamente para onde seu dinheiro foi." },
             ].map((item, i) => (
               <div
                 key={i}
@@ -260,9 +257,7 @@ export default function Index() {
                   </div>
                   <h3 className="font-semibold text-lg">{item.title}</h3>
                 </div>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {item.desc}
-                </p>
+                <p className="text-muted-foreground text-sm leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -272,26 +267,40 @@ export default function Index() {
       {/* ─── CAMPAIGNS ─── */}
       <section ref={campaignsSection.ref} id="campanhas" className="py-20 md:py-28">
         <div className="container">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
             <div>
-              <p
-                className={`text-sm font-semibold text-primary uppercase tracking-wider mb-2 transition-all duration-600 ${campaignsSection.visible ? "opacity-100" : "opacity-0"}`}
-              >
+              <p className={`text-sm font-semibold text-primary uppercase tracking-wider mb-2 transition-all duration-600 ${campaignsSection.visible ? "opacity-100" : "opacity-0"}`}>
                 Faça a diferença
               </p>
-              <h2
-                className={`text-3xl md:text-4xl font-bold transition-all duration-600 delay-100 ${campaignsSection.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
-                style={{ lineHeight: "1.1" }}
-              >
+              <h2 className={`text-3xl md:text-4xl font-bold transition-all duration-600 delay-100 ${campaignsSection.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`} style={{ lineHeight: "1.1" }}>
                 Campanhas em andamento
               </h2>
             </div>
-            <p
-              className={`text-muted-foreground text-sm max-w-xs transition-all duration-600 delay-200 ${campaignsSection.visible ? "opacity-100" : "opacity-0"}`}
-            >
-              Cada campanha é verificada pela nossa equipe para garantir
-              legitimidade e transparência.
+            <p className={`text-muted-foreground text-sm max-w-xs transition-all duration-600 delay-200 ${campaignsSection.visible ? "opacity-100" : "opacity-0"}`}>
+              Cada campanha é verificada pela nossa equipe para garantir legitimidade e transparência.
             </p>
+          </div>
+
+          {/* Filter tabs */}
+          <div className="flex gap-2 mb-8">
+            {([
+              { key: "all" as const, label: "Todas", icon: Heart },
+              { key: "trending" as const, label: "Em alta", icon: Flame },
+              { key: "urgent" as const, label: "Urgentes", icon: Clock },
+            ]).map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  filter === key
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </button>
+            ))}
           </div>
 
           {loading ? (
@@ -307,21 +316,61 @@ export default function Index() {
                 </div>
               ))}
             </div>
-          ) : campaigns.length === 0 ? (
+          ) : filteredCampaigns.length === 0 ? (
             <div className="text-center py-24 border rounded-2xl bg-card">
               <HandHeart className="w-14 h-14 mx-auto mb-5 text-muted-foreground/30" />
-              <p className="text-lg font-medium">Nenhuma campanha ativa no momento</p>
+              <p className="text-lg font-medium">Nenhuma campanha encontrada</p>
               <p className="text-sm text-muted-foreground mt-1.5">
-                Novas campanhas serão publicadas em breve!
+                Tente outro filtro ou volte em breve!
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-              {campaigns.map((c, i) => (
+              {filteredCampaigns.map((c, i) => (
                 <CampaignCard key={c.id} campaign={c} index={i} />
               ))}
             </div>
           )}
+        </div>
+      </section>
+
+      {/* ─── TESTIMONIALS ─── */}
+      <section ref={testimonials.ref} className="py-16 md:py-24 bg-muted/40">
+        <div className="container">
+          <div className="text-center max-w-xl mx-auto mb-12">
+            <p className={`text-sm font-semibold text-primary uppercase tracking-wider mb-3 transition-all duration-600 ${testimonials.visible ? "opacity-100" : "opacity-0"}`}>
+              Depoimentos
+            </p>
+            <h2 className={`text-3xl md:text-4xl font-bold transition-all duration-600 delay-100 ${testimonials.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`} style={{ lineHeight: "1.1" }}>
+              O que dizem nossos doadores
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              { name: "Ana Clara", text: "Fiquei impressionada com a transparência. Acompanhei cada atualização da campanha que ajudei. Recomendo para todos!", stars: 5 },
+              { name: "Carlos Eduardo", text: "Doei via Pix em 30 segundos. Sem cadastro, sem burocracia. A melhor plataforma de doações que já usei.", stars: 5 },
+              { name: "Fernanda Lima", text: "A equipe verifica cada campanha, o que me dá muita confiança. Já contribuí com 3 campanhas diferentes!", stars: 5 },
+            ].map((t, i) => (
+              <div
+                key={i}
+                className={`bg-card rounded-2xl p-6 border shadow-sm transition-all duration-500 ${testimonials.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
+                style={{ transitionDelay: `${200 + i * 100}ms` }}
+              >
+                <div className="flex gap-0.5 mb-4">
+                  {Array.from({ length: t.stars }).map((_, j) => (
+                    <Star key={j} className="w-4 h-4 text-secondary fill-secondary" />
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4">"{t.text}"</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                    {t.name.charAt(0)}
+                  </div>
+                  <span className="text-sm font-medium">{t.name}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -330,46 +379,23 @@ export default function Index() {
         <div className="container">
           <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center">
             <div>
-              <p
-                className={`text-sm font-semibold text-secondary uppercase tracking-wider mb-3 transition-all duration-600 ${trust.visible ? "opacity-100" : "opacity-0"}`}
-              >
+              <p className={`text-sm font-semibold text-secondary uppercase tracking-wider mb-3 transition-all duration-600 ${trust.visible ? "opacity-100" : "opacity-0"}`}>
                 Confiança e segurança
               </p>
-              <h2
-                className={`text-3xl md:text-4xl font-bold leading-[1.1] transition-all duration-600 delay-100 ${trust.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
-              >
+              <h2 className={`text-3xl md:text-4xl font-bold leading-[1.1] transition-all duration-600 delay-100 ${trust.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
                 Por que confiar na Vaquinha?
               </h2>
-              <p
-                className={`mt-5 text-primary-foreground/70 text-base leading-relaxed max-w-md transition-all duration-600 delay-200 ${trust.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
-              >
-                Acreditamos que a transparência é a base de qualquer ação
-                solidária. Cada real é rastreável e cada campanha é verificada.
+              <p className={`mt-5 text-primary-foreground/70 text-base leading-relaxed max-w-md transition-all duration-600 delay-200 ${trust.visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+                Acreditamos que a transparência é a base de qualquer ação solidária. Cada real é rastreável e cada campanha é verificada.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
-                {
-                  icon: Shield,
-                  title: "Pix protegido",
-                  desc: "Todas as transações são processadas por gateways certificados pelo Banco Central.",
-                },
-                {
-                  icon: TrendingUp,
-                  title: "Valores em tempo real",
-                  desc: "Cada doação atualiza o progresso instantaneamente, sem atrasos.",
-                },
-                {
-                  icon: CheckCircle2,
-                  title: "Campanhas verificadas",
-                  desc: "Nosso time analisa cada campanha antes de publicá-la na plataforma.",
-                },
-                {
-                  icon: Users,
-                  title: "Sem cadastro",
-                  desc: "Doe em segundos sem criar conta. Simples como deve ser.",
-                },
+                { icon: Shield, title: "Pix protegido", desc: "Todas as transações são processadas por gateways certificados pelo Banco Central." },
+                { icon: TrendingUp, title: "Valores em tempo real", desc: "Cada doação atualiza o progresso instantaneamente, sem atrasos." },
+                { icon: CheckCircle2, title: "Campanhas verificadas", desc: "Nosso time analisa cada campanha antes de publicá-la na plataforma." },
+                { icon: Users, title: "Sem cadastro", desc: "Doe em segundos sem criar conta. Simples como deve ser." },
               ].map((item, i) => (
                 <div
                   key={i}
@@ -378,9 +404,7 @@ export default function Index() {
                 >
                   <item.icon className="w-5 h-5 text-secondary mb-3" />
                   <h3 className="font-semibold text-sm mb-1.5">{item.title}</h3>
-                  <p className="text-xs text-primary-foreground/60 leading-relaxed">
-                    {item.desc}
-                  </p>
+                  <p className="text-xs text-primary-foreground/60 leading-relaxed">{item.desc}</p>
                 </div>
               ))}
             </div>
@@ -399,15 +423,11 @@ export default function Index() {
 
             <div className="relative z-10 max-w-lg mx-auto">
               <HandHeart className="w-10 h-10 mx-auto mb-5 text-primary-foreground/80" />
-              <h2
-                className="text-2xl md:text-3xl lg:text-4xl font-bold text-primary-foreground"
-                style={{ lineHeight: "1.1" }}
-              >
+              <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-primary-foreground" style={{ lineHeight: "1.1" }}>
                 Pronto para fazer a diferença?
               </h2>
               <p className="mt-4 text-primary-foreground/75 text-base md:text-lg">
-                Escolha uma campanha e contribua agora. Cada doação, por menor
-                que seja, transforma realidades.
+                Escolha uma campanha e contribua agora. Cada doação, por menor que seja, transforma realidades.
               </p>
               <a
                 href="#campanhas"
