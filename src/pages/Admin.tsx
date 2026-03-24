@@ -10,13 +10,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Heart, Plus, Pencil, Trash2, Eye, LayoutDashboard, Lock,
-  DollarSign, BarChart3, FileText, ChevronRight, X, ArrowLeft
+  DollarSign, BarChart3, FileText, ChevronRight, X, ArrowLeft,
+  Activity, Monitor, Smartphone, Tablet, Globe, TrendingUp
 } from "lucide-react";
 import { toast } from "sonner";
 
 const ADMIN_PASS = "vaquinha2024";
 
-type View = "dashboard" | "campaigns" | "campaign-detail";
+type View = "dashboard" | "campaigns" | "campaign-detail" | "analytics";
+
+interface PageViewStats {
+  totalViews: number;
+  todayViews: number;
+  weekViews: number;
+  byPage: { page: string; count: number }[];
+  byDevice: { device_type: string; count: number }[];
+  byDay: { day: string; count: number }[];
+}
 
 export default function Admin() {
   const [authed, setAuthed] = useState(false);
@@ -28,6 +38,7 @@ export default function Admin() {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editCampaign, setEditCampaign] = useState<Partial<Campaign> | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<PageViewStats | null>(null);
 
   const loadCampaigns = useCallback(async () => {
     const { data } = await supabase.from("campaigns").select("*").order("created_at", { ascending: false });
@@ -48,12 +59,53 @@ export default function Admin() {
     setDonations((data as Donation[]) || []);
   }, []);
 
+  const loadAnalytics = useCallback(async () => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [allViews, todayViews, weekViews] = await Promise.all([
+      supabase.from("page_views").select("id", { count: "exact", head: true }),
+      supabase.from("page_views").select("id", { count: "exact", head: true }).gte("created_at", todayStart),
+      supabase.from("page_views").select("id", { count: "exact", head: true }).gte("created_at", weekStart),
+    ]);
+
+    // Get recent views for breakdown
+    const { data: recentViews } = await supabase
+      .from("page_views")
+      .select("page, device_type, created_at")
+      .gte("created_at", weekStart)
+      .order("created_at", { ascending: false })
+      .limit(1000);
+
+    const byPage: Record<string, number> = {};
+    const byDevice: Record<string, number> = {};
+    const byDay: Record<string, number> = {};
+
+    (recentViews || []).forEach((v: any) => {
+      byPage[v.page] = (byPage[v.page] || 0) + 1;
+      byDevice[v.device_type] = (byDevice[v.device_type] || 0) + 1;
+      const day = new Date(v.created_at).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" });
+      byDay[day] = (byDay[day] || 0) + 1;
+    });
+
+    setAnalyticsData({
+      totalViews: allViews.count || 0,
+      todayViews: todayViews.count || 0,
+      weekViews: weekViews.count || 0,
+      byPage: Object.entries(byPage).map(([page, count]) => ({ page, count })).sort((a, b) => b.count - a.count),
+      byDevice: Object.entries(byDevice).map(([device_type, count]) => ({ device_type, count })).sort((a, b) => b.count - a.count),
+      byDay: Object.entries(byDay).map(([day, count]) => ({ day, count })),
+    });
+  }, []);
+
   useEffect(() => {
     if (authed) {
       loadCampaigns();
       loadAllDonations();
+      loadAnalytics();
     }
-  }, [authed, loadCampaigns, loadAllDonations]);
+  }, [authed, loadCampaigns, loadAllDonations, loadAnalytics]);
 
   const handleLogin = () => {
     if (pass === ADMIN_PASS) setAuthed(true);
@@ -61,7 +113,7 @@ export default function Admin() {
   };
 
   const openNew = () => {
-    setEditCampaign({ titulo: "", descricao: "", meta_valor: 0, imagem: "", video: "", status: "active" });
+    setEditCampaign({ titulo: "", descricao: "", meta_valor: 0, valor_atual: 0, imagem: "", video: "", status: "active" });
     setEditOpen(true);
   };
 
@@ -79,6 +131,7 @@ export default function Admin() {
       titulo: editCampaign.titulo,
       descricao: editCampaign.descricao,
       meta_valor: editCampaign.meta_valor,
+      valor_atual: editCampaign.valor_atual || 0,
       imagem: editCampaign.imagem,
       video: editCampaign.video || "",
       status: editCampaign.status,
@@ -115,7 +168,6 @@ export default function Admin() {
   const totalRaised = campaigns.reduce((s, c) => s + c.valor_atual, 0);
   const activeCampaigns = campaigns.filter(c => c.status === "active").length;
   const paidDonations = allDonations.filter(d => d.status === "paid");
-  const totalDonationsValue = paidDonations.reduce((s, d) => s + d.valor, 0);
 
   // --- Login screen ---
   if (!authed) {
@@ -145,6 +197,12 @@ export default function Admin() {
     );
   }
 
+  const deviceIcon = (type: string) => {
+    if (type === "mobile") return <Smartphone className="w-4 h-4" />;
+    if (type === "tablet") return <Tablet className="w-4 h-4" />;
+    return <Monitor className="w-4 h-4" />;
+  };
+
   // --- Admin layout ---
   return (
     <div className="min-h-screen bg-muted/40">
@@ -165,15 +223,16 @@ export default function Admin() {
 
       {/* Nav tabs */}
       <div className="bg-card border-b">
-        <div className="container flex gap-1 py-1">
+        <div className="container flex gap-1 py-1 overflow-x-auto">
           {([
             { key: "dashboard", label: "Dashboard", icon: BarChart3 },
             { key: "campaigns", label: "Campanhas", icon: FileText },
+            { key: "analytics", label: "Analytics", icon: Activity },
           ] as const).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setView(key)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${view === key || (view === "campaign-detail" && key === "campaigns") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${view === key || (view === "campaign-detail" && key === "campaigns") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
             >
               <Icon className="w-4 h-4" />
               {label}
@@ -248,6 +307,133 @@ export default function Admin() {
           </div>
         )}
 
+        {/* Analytics view */}
+        {view === "analytics" && (
+          <div className="space-y-8 fade-in-up">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Analytics</h2>
+                <p className="text-muted-foreground mt-1">Acompanhe o tráfego e comportamento dos visitantes</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={loadAnalytics}>
+                <Activity className="w-4 h-4 mr-2" /> Atualizar
+              </Button>
+            </div>
+
+            {analyticsData && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[
+                    { label: "Visualizações Hoje", value: analyticsData.todayViews, icon: Eye, color: "text-primary" },
+                    { label: "Últimos 7 dias", value: analyticsData.weekViews, icon: TrendingUp, color: "text-blue-600" },
+                    { label: "Total de Visualizações", value: analyticsData.totalViews, icon: Globe, color: "text-emerald-600" },
+                  ].map(({ label, value, icon: Icon, color }) => (
+                    <div key={label} className="rounded-xl border bg-card p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">{label}</span>
+                        <Icon className={`w-5 h-5 ${color}`} />
+                      </div>
+                      <p className="text-3xl font-bold tabular-nums">{value.toLocaleString("pt-BR")}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* By page */}
+                  <div className="rounded-xl border bg-card overflow-hidden">
+                    <div className="p-5 border-b">
+                      <h3 className="font-semibold">Páginas mais visitadas</h3>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {analyticsData.byPage.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">Nenhum dado ainda</p>
+                      ) : (
+                        analyticsData.byPage.slice(0, 10).map((p) => {
+                          const maxCount = analyticsData.byPage[0]?.count || 1;
+                          return (
+                            <div key={p.page} className="space-y-1">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="font-medium truncate max-w-[200px]">{p.page}</span>
+                                <span className="text-muted-foreground tabular-nums">{p.count}</span>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-primary transition-all"
+                                  style={{ width: `${(p.count / maxCount) * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* By device */}
+                  <div className="rounded-xl border bg-card overflow-hidden">
+                    <div className="p-5 border-b">
+                      <h3 className="font-semibold">Dispositivos</h3>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      {analyticsData.byDevice.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-8">Nenhum dado ainda</p>
+                      ) : (
+                        analyticsData.byDevice.map((d) => {
+                          const total = analyticsData.byDevice.reduce((s, x) => s + x.count, 0);
+                          const pct = total > 0 ? Math.round((d.count / total) * 100) : 0;
+                          const labels: Record<string, string> = { desktop: "Desktop", mobile: "Mobile", tablet: "Tablet" };
+                          return (
+                            <div key={d.device_type} className="flex items-center gap-4">
+                              <div className="p-2.5 rounded-lg bg-muted">
+                                {deviceIcon(d.device_type)}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between text-sm mb-1">
+                                  <span className="font-medium">{labels[d.device_type] || d.device_type}</span>
+                                  <span className="text-muted-foreground">{pct}% ({d.count})</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                  <div className="h-full rounded-full bg-secondary transition-all" style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* By day */}
+                <div className="rounded-xl border bg-card overflow-hidden">
+                  <div className="p-5 border-b">
+                    <h3 className="font-semibold">Visitas por dia (últimos 7 dias)</h3>
+                  </div>
+                  <div className="p-5">
+                    {analyticsData.byDay.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">Nenhum dado ainda</p>
+                    ) : (
+                      <div className="flex items-end gap-2 h-40">
+                        {analyticsData.byDay.map((d) => {
+                          const maxCount = Math.max(...analyticsData.byDay.map(x => x.count), 1);
+                          const height = Math.max((d.count / maxCount) * 100, 8);
+                          return (
+                            <div key={d.day} className="flex-1 flex flex-col items-center gap-1.5">
+                              <span className="text-xs font-medium tabular-nums">{d.count}</span>
+                              <div className="w-full rounded-t-md bg-primary/80" style={{ height: `${height}%` }} />
+                              <span className="text-[10px] text-muted-foreground">{d.day}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Campaigns list view */}
         {view === "campaigns" && (
           <div className="space-y-6 fade-in-up">
@@ -273,7 +459,6 @@ export default function Admin() {
                 {campaigns.map((c) => (
                   <div key={c.id} className="rounded-xl border bg-card hover:shadow-md transition-shadow overflow-hidden">
                     <div className="flex flex-col sm:flex-row">
-                      {/* Thumbnail */}
                       <div className="sm:w-48 h-32 sm:h-auto flex-shrink-0">
                         {c.imagem ? (
                           <img src={c.imagem} alt={c.titulo} className="w-full h-full object-cover" />
@@ -283,7 +468,6 @@ export default function Admin() {
                           </div>
                         )}
                       </div>
-                      {/* Info */}
                       <div className="flex-1 p-5 flex flex-col justify-between gap-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-1 min-w-0">
@@ -329,7 +513,6 @@ export default function Admin() {
             </button>
 
             <div className="grid lg:grid-cols-3 gap-6">
-              {/* Campaign info */}
               <div className="lg:col-span-2 space-y-6">
                 <div className="rounded-xl border bg-card overflow-hidden">
                   {selectedCampaign.imagem && (
@@ -355,7 +538,6 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* Stats sidebar */}
               <div className="space-y-4">
                 <div className="rounded-xl border bg-card p-6 space-y-4">
                   <h3 className="font-semibold">Progresso</h3>
@@ -452,9 +634,9 @@ export default function Admin() {
                 <p className="text-xs text-muted-foreground">Quanto mais detalhes, mais confiança os doadores terão.</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Meta de arrecadação (R$) *</label>
+                  <label className="text-sm font-medium">Meta (R$) *</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
                     <Input
@@ -462,6 +644,19 @@ export default function Admin() {
                       placeholder="0,00"
                       value={editCampaign.meta_valor ? (editCampaign.meta_valor / 100).toFixed(2) : ""}
                       onChange={(e) => setEditCampaign({ ...editCampaign, meta_valor: Math.round(parseFloat(e.target.value || "0") * 100) })}
+                      className="pl-10 h-12"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Valor arrecadado (R$)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                    <Input
+                      type="number"
+                      placeholder="0,00"
+                      value={editCampaign.valor_atual !== undefined ? (editCampaign.valor_atual / 100).toFixed(2) : ""}
+                      onChange={(e) => setEditCampaign({ ...editCampaign, valor_atual: Math.round(parseFloat(e.target.value || "0") * 100) })}
                       className="pl-10 h-12"
                     />
                   </div>
