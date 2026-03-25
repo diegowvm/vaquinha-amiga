@@ -1,51 +1,113 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
-import { encode as hexEncode } from "https://deno.land/std@0.168.0/encoding/hex.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Authenticate with SimPay using email/password
+// Authenticate with SimPay using client_id/client_secret
 async function getSimPayToken(): Promise<string | null> {
-  const email = Deno.env.get("SIMPAY_API_EMAIL");
-  const password = Deno.env.get("SIMPAY_API_PASSWORD");
+  const clientId = Deno.env.get("SIMPAY_CLIENT_ID");
+  const clientSecret = Deno.env.get("SIMPAY_CLIENT_SECRET");
 
-  if (!email || !password) {
-    console.error("SIMPAY_API_EMAIL ou SIMPAY_API_PASSWORD não configurados");
+  if (!clientId || !clientSecret) {
+    console.error("SIMPAY_CLIENT_ID ou SIMPAY_CLIENT_SECRET não configurados");
     return null;
   }
 
-  console.log("Autenticando na SimPay com email:", email);
+  console.log("Autenticando na SimPay com client_id:", clientId.substring(0, 8) + "...");
 
-  try {
-    const res = await fetch("https://api.saq.digital/v2/auth", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    });
+  // Try multiple possible auth endpoints
+  const authEndpoints = [
+    "https://api.saq.digital/v2/auth/token",
+    "https://api.saq.digital/v2/auth",
+    "https://api.saq.digital/v2/token",
+    "https://api.saq.digital/auth/token",
+  ];
 
-    const text = await res.text();
-    console.log("SimPay Auth STATUS:", res.status);
-    console.log("SimPay Auth RESPONSE:", text);
+  for (const authUrl of authEndpoints) {
+    try {
+      console.log("Tentando auth em:", authUrl);
+      const res = await fetch(authUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+        }),
+      });
 
-    if (!res.ok) {
-      console.error("Erro na autenticação SimPay:", res.status, text);
-      return null;
+      const text = await res.text();
+      console.log(`Auth ${authUrl} STATUS:`, res.status);
+      console.log(`Auth ${authUrl} RESPONSE:`, text.substring(0, 500));
+
+      if (res.ok) {
+        try {
+          const data = JSON.parse(text);
+          const token = data.token || data.access_token || data.access || null;
+          if (token) {
+            console.log("Token obtido com sucesso via:", authUrl);
+            return token;
+          }
+          console.log("Resposta OK mas sem token. Keys:", Object.keys(data));
+        } catch {
+          console.error("Resposta não é JSON válido");
+        }
+      }
+    } catch (err) {
+      console.error(`Erro ao tentar ${authUrl}:`, err);
     }
-
-    const data = JSON.parse(text);
-    return data.token || data.access_token || null;
-  } catch (err) {
-    console.error("Exceção ao autenticar na SimPay:", err);
-    return null;
   }
+
+  // Also try with email/password format in case that's what the credentials are
+  const emailAuth = Deno.env.get("SIMPAY_API_EMAIL");
+  const passwordAuth = Deno.env.get("SIMPAY_API_PASSWORD");
+  
+  if (emailAuth && passwordAuth) {
+    for (const authUrl of authEndpoints) {
+      try {
+        console.log("Tentando auth com email/password em:", authUrl);
+        const res = await fetch(authUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+          },
+          body: JSON.stringify({
+            email: emailAuth,
+            password: passwordAuth,
+          }),
+        });
+
+        const text = await res.text();
+        console.log(`Auth email ${authUrl} STATUS:`, res.status);
+        console.log(`Auth email ${authUrl} RESPONSE:`, text.substring(0, 500));
+
+        if (res.ok) {
+          try {
+            const data = JSON.parse(text);
+            const token = data.token || data.access_token || data.access || null;
+            if (token) {
+              console.log("Token obtido com email/password via:", authUrl);
+              return token;
+            }
+          } catch {
+            // skip
+          }
+        }
+      } catch (err) {
+        console.error(`Erro email auth ${authUrl}:`, err);
+      }
+    }
+  }
+
+  console.error("Nenhum endpoint de autenticação funcionou");
+  return null;
 }
 
 // Generate HMAC-SHA256
@@ -65,7 +127,6 @@ async function generateHmac(secret: string, payload: string): Promise<string> {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -74,8 +135,7 @@ serve(async (req) => {
     const { campaign_id, valor, donor_name, donor_email } = await req.json();
 
     console.log("=== DONATE REQUEST ===");
-    console.log("campaign_id:", campaign_id);
-    console.log("valor:", valor);
+    console.log("campaign_id:", campaign_id, "valor:", valor);
 
     if (!campaign_id || !valor || valor <= 0) {
       return new Response(
@@ -84,7 +144,6 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -93,11 +152,7 @@ serve(async (req) => {
     // 1. Create donation record
     const { data: donation, error: donationError } = await supabase
       .from("donations")
-      .insert({
-        campaign_id,
-        valor: Number(valor),
-        status: "pending",
-      })
+      .insert({ campaign_id, valor: Number(valor), status: "pending" })
       .select()
       .single();
 
@@ -112,45 +167,36 @@ serve(async (req) => {
     console.log("Doação criada:", donation.id);
 
     // 2. Create transaction record
-    const { error: txError } = await supabase
-      .from("transactions")
-      .insert({
-        donation_id: donation.id,
-        status: "pending",
-        gateway_id: "",
-      });
-
-    if (txError) {
-      console.error("Erro ao criar transação:", txError);
-    }
+    await supabase.from("transactions").insert({
+      donation_id: donation.id,
+      status: "pending",
+      gateway_id: "",
+    });
 
     // 3. Authenticate with SimPay
     const token = await getSimPayToken();
 
     if (!token) {
       return new Response(
-        JSON.stringify({
-          error: "Falha na autenticação com SimPay",
-          donation_id: donation.id,
-        }),
+        JSON.stringify({ error: "Falha na autenticação com SimPay. Verifique os logs.", donation_id: donation.id }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Token SimPay obtido com sucesso");
-
-    // 4. Prepare PIX request body (valor comes in cents, SimPay expects reais)
+    // 4. Prepare PIX request (valor is in cents, SimPay expects reais as decimal)
     const amountInReais = Number(valor) / 100;
-    const pixBody = {
+    const pixBody: Record<string, unknown> = {
       amount: amountInReais,
-      description: "Doação via plataforma",
-      customer: {
-        name: donor_name || "Doador Anônimo",
-        email: donor_email || "doador@plataforma.com",
-      },
       tag: String(donation.id),
       base_64_image: true,
+      type_fine: "NONE",
+      fine: 0,
     };
+
+    // Add optional debtor info if provided
+    if (donor_name) {
+      pixBody.debtor_name = donor_name;
+    }
 
     const pixBodyStr = JSON.stringify(pixBody);
     console.log("PIX Request Body:", pixBodyStr);
@@ -161,8 +207,6 @@ serve(async (req) => {
     if (hmacSecret) {
       hmacSignature = await generateHmac(hmacSecret, pixBodyStr);
       console.log("HMAC gerado:", hmacSignature.substring(0, 20) + "...");
-    } else {
-      console.warn("SIMPAY_HMAC não configurado, enviando sem HMAC");
     }
 
     // 6. Create PIX charge
@@ -171,12 +215,11 @@ serve(async (req) => {
       "Authorization": `Bearer ${token}`,
       "Accept": "application/json",
     };
-
     if (hmacSignature) {
       headers["hmac"] = hmacSignature;
     }
 
-    console.log("Enviando requisição PIX para SimPay...");
+    console.log("Enviando PIX para SimPay...");
     const pixRes = await fetch("https://api.saq.digital/v2/finance/pix/cash-in/", {
       method: "POST",
       headers,
@@ -185,15 +228,11 @@ serve(async (req) => {
 
     const responseText = await pixRes.text();
     console.log("SimPay PIX STATUS:", pixRes.status);
-    console.log("SimPay PIX RESPONSE:", responseText);
+    console.log("SimPay PIX RESPONSE:", responseText.substring(0, 1000));
 
     if (!pixRes.ok) {
       return new Response(
-        JSON.stringify({
-          error: `SimPay erro (${pixRes.status})`,
-          details: responseText,
-          donation_id: donation.id,
-        }),
+        JSON.stringify({ error: `SimPay erro (${pixRes.status})`, details: responseText, donation_id: donation.id }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -204,16 +243,12 @@ serve(async (req) => {
       pixData = JSON.parse(responseText);
     } catch {
       return new Response(
-        JSON.stringify({
-          error: "Resposta da SimPay não é JSON válido",
-          raw: responseText,
-          donation_id: donation.id,
-        }),
+        JSON.stringify({ error: "Resposta SimPay não é JSON", raw: responseText, donation_id: donation.id }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 8. Save gateway_id
+    // 8. Update transaction with gateway_id
     const gatewayId = pixData.qr_code_id || pixData.id || "";
     await supabase
       .from("transactions")
@@ -221,21 +256,19 @@ serve(async (req) => {
       .eq("donation_id", donation.id);
 
     console.log("=== PIX GERADO COM SUCESSO ===");
-    console.log("Gateway ID:", gatewayId);
+    console.log("worked:", pixData.worked, "qr_code_id:", gatewayId);
 
-    // 9. Return QR code data
+    // 9. Return QR code - SimPay returns base_64_image_url (URL) and pix_copy_and_paste
+    const qrCodeImage = pixData.base_64_image || pixData.base_64_image_url || "";
+    const pixCopyPaste = pixData.pix_copy_and_paste || "";
+
     return new Response(
       JSON.stringify({
         donation_id: donation.id,
-        qr_code: pixData.base_64_image || pixData.base_64_image_url || pixData.qr_code || "",
-        pix_code: pixData.pix_copy_and_paste || pixData.pix_code || pixData.emv || "",
+        qr_code: qrCodeImage,
+        pix_code: pixCopyPaste,
       }),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
     console.error("Erro geral na função donate:", err);
