@@ -139,9 +139,10 @@ serve(async (req) => {
 
     console.log("Token SimPay obtido com sucesso");
 
-    // 4. Prepare PIX request body
+    // 4. Prepare PIX request body (valor comes in cents, SimPay expects reais)
+    const amountInReais = Number(valor) / 100;
     const pixBody = {
-      amount: Number(valor),
+      amount: amountInReais,
       description: "Doação via plataforma",
       customer: {
         name: donor_name || "Doador Anônimo",
